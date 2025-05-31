@@ -21,7 +21,7 @@ logFile.Name = 'wtb_wts/log.lua'
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.2 alfa", -- пишет в файл
+    version = "0.0.3", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
     desc = "Trade proposition logging"
 }
 
@@ -82,7 +82,7 @@ local function restoreProtected(text, protected)
 end
 
 
-local function prepareMessage(message, name)
+local function prepareMessage(message)
 
 	-- Заміняємо частини в квадратних дужках на тимчасові токени
 	local cleanedMessage, protectedParts = extractProtected(message)
@@ -112,11 +112,12 @@ local function prepareMessage(message, name)
 	--local endText = {chatMsg=tostring"||||"..(channel).."||||"..name.."||||"..cleanedMessage.."||||"}
 	--api.File:Write(logFile.Name, endText)
 
-	local resultText = (name .. ": ".. cleanedMessage)
+	--local resultText = (name .. ": ".. cleanedMessage)
 	--api.Log:Err("[WTB/WTS] " .. resultText)
 	--api.Log:Info(endText)
 
-	return resultText
+	--return resultText
+	return cleanedMessage
 
 end
 
@@ -130,29 +131,38 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
         -- Skip messages beginning with x and a space (looking for raid invites)
         if string.sub(message, 1, 1) == "x" and string.sub(message, 2, 2) == " " then return end  
 
-		if string.find(message, 'WTS', 1, true) then
+
+
+		if string.find(message, 'WTS', 1, true) or string.find(message, 'wts', 1, true) then
 			if logFile.data.wts == nil then
 				logFile.data.wts = {}
 			end
 			
-			--api.Log:Err("[WTB/WTS] " .. message)
-
-			local resultText = prepareMessage(message, name)
-			--api.Log:Err("[WTS] " .. resultText)
+			local resultText = {}
+			resultText.time = api.Time:GetLocalTime()
+			resultText.name = name
+			--resultText.rawmessage = message
+			resultText.message = prepareMessage(message)
 			
 			table.insert(logFile.data.wts, resultText)
 			--api.Log:Info(logFile.data.wts)
 			saveData(logFile.data)
 		end
 		
-		if string.find(message, 'WTB', 1, true) then
+		
+		
+		if string.find(message, 'WTB', 1, true) or string.find(message, 'wtb', 1, true) then
 			if logFile.data.wtb == nil then
 				logFile.data.wtb = {}
 			end
 			
-			local resultText = prepareMessage(message, name)
-			--api.Log:Err("[WTB] " .. resultText)
+			local resultText = {}
+			resultText.time = api.Time:GetLocalTime()
+			resultText.name = name
+			--resultText.rawmessage = message
+			resultText.message = prepareMessage(message)
 			
+			--api.Log:Err("[WTB] " .. resultText)
 			table.insert(logFile.data.wtb, resultText)
 			--api.Log:Info(logFile.data.wtb)
 			saveData(logFile.data)
