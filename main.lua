@@ -1,7 +1,8 @@
 local api = require("api")
 
 local logFile = {}
-logFile.Name = 'wtb_wts/log.lua'
+logFile.Name1 = 'wtb_wts/log.lua'
+logFile.Name2 = 'wtb_wts/massiv.lua'
 
 --[[
 	Альфа вариант:
@@ -21,15 +22,15 @@ logFile.Name = 'wtb_wts/log.lua'
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.3", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
+    version = "0.0.3a", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
     desc = "Trade proposition logging"
 }
 
 local wtb_wtsWindow
 
 
-function getData()
-    local data = api.File:Read(logFile.Name)
+function getData(filename)
+    local data = api.File:Read(filename)
     if data == nil then return {} end
     return data
 end
@@ -42,7 +43,7 @@ GetSavedItems = function(reverse)
 end
 ]]
 
-function saveData(data) api.File:Write(logFile.Name, data) end
+--function saveData(filename, data) api.File:Write(filename, data) end
 
 
 
@@ -82,10 +83,14 @@ local function restoreProtected(text, protected)
 end
 
 
+-- магия над мессаджем )
 local function prepareMessage(message)
 
 	-- Заміняємо частини в квадратних дужках на тимчасові токени
 	local cleanedMessage, protectedParts = extractProtected(message)
+	
+	--api.Log:Err(cleanedMessage .." == ".. protectedParts)
+	--api.Log:Err(cleanedMessage)
 	
 	-- Replace item link text with the item's name
 	local count = 0
@@ -99,7 +104,8 @@ local function prepareMessage(message)
 			
 			local beforeLink = string.sub(cleanedMessage, 0, beginIndex)
 			local afterLink = string.sub(cleanedMessage, endIndex + 1, #cleanedMessage)
-			cleanedMessage = beforeLink .. "" .. itemInfo.name .. " " .. afterLink 
+			--cleanedMessage = beforeLink .. "" .. itemInfo.name .. " " .. afterLink 
+			cleanedMessage = beforeLink .. "[" .. itemInfo.name .. "] " .. afterLink 
 		end 
 		count = count + 1
 	end 
@@ -133,39 +139,55 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
 
 
 
-		if string.find(message, 'WTS', 1, true) or string.find(message, 'wts', 1, true) then
-			if logFile.data.wts == nil then
-				logFile.data.wts = {}
-			end
+		if string.find(message, 'WTS', 1, true) or string.find(message, 'wts', 1, true) or string.find(message, 'WTT/S', 1, true) or string.find(message, 'WTTS', 1, true) then
+			if logFile.data1.wts == nil then logFile.data1.wts = {} end
+			if logFile.data2.wts == nil then logFile.data2.wts = {} end
 			
 			local resultText = {}
 			resultText.time = api.Time:GetLocalTime()
 			resultText.name = name
 			--resultText.rawmessage = message
 			resultText.message = prepareMessage(message)
+
+				--api.Log:Err(resultText.message)
+
+			table.insert(logFile.data1.wts,  (resultText.time .."|".. resultText.name .."|".. resultText.message))
+			--saveData(logFile.data1)
 			
-			table.insert(logFile.data.wts, resultText)
+				api.Log:Info(resultText.time .." ".. resultText.name .." ".. resultText.message)
+			
+			table.insert(logFile.data2.wts, resultText)
 			--api.Log:Info(logFile.data.wts)
-			saveData(logFile.data)
+			--saveData(logFile.data2)
+			
+			api.File:Write(logFile.Name1, logFile.data1)
+			api.File:Write(logFile.Name2, logFile.data2)
 		end
 		
 		
 		
 		if string.find(message, 'WTB', 1, true) or string.find(message, 'wtb', 1, true) then
-			if logFile.data.wtb == nil then
-				logFile.data.wtb = {}
-			end
+			if logFile.data1.wtb == nil then logFile.data1.wtb = {} end
+			if logFile.data2.wtb == nil then logFile.data2.wtb = {} end
 			
 			local resultText = {}
 			resultText.time = api.Time:GetLocalTime()
 			resultText.name = name
 			--resultText.rawmessage = message
 			resultText.message = prepareMessage(message)
+			--resultText.items = resultText.message
+
+				--api.Log:Err(resultText.message)
+
+			table.insert(logFile.data1.wtb,  (resultText.time .."|".. resultText.name .."|".. resultText.message))
 			
-			--api.Log:Err("[WTB] " .. resultText)
-			table.insert(logFile.data.wtb, resultText)
+				api.Log:Info(resultText.time .." ".. resultText.name .." ".. resultText.message)
+				
+			table.insert(logFile.data2.wtb, resultText)
 			--api.Log:Info(logFile.data.wtb)
-			saveData(logFile.data)
+			
+			api.File:Write(logFile.Name1, logFile.data1)
+			api.File:Write(logFile.Name2, logFile.data2)
 		end
    end
 end
@@ -179,7 +201,9 @@ local function OnLoad()
     local settings = api.GetSettings("wtb_wts")
     --base64 = require('cant_read/base64/rfc')
 
-	logFile.data = getData()
+	logFile.data1 = getData(logFile.Name1)
+	logFile.data2 = getData(logFile.Name2)
+	
 	--logFile.data = GetSavedItems()
 
     wtb_wtsWindow = api.Interface:CreateEmptyWindow("wtb_wtsWindow", "UIParent")
