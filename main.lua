@@ -184,8 +184,16 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
 			if logFile.data1.wtb == nil then logFile.data1.wtb = {} end
 			if logFile.data2.wtb == nil then logFile.data2.wtb = {} end
 			
-			local resultText = {}
-			resultText.time = api.Time:GetLocalTime()
+			resultText.timestamp = api.Time:GetLocalTime()
+			
+            local date = helpers.getDate(resultText.timestamp)
+
+			resultText.time = string.format(
+                                    '%02d.%02d.%d %02d:%02d',
+                                    date.day, date.month, date.year, (date.hours + timeZone),
+                                    date.minutes)
+			
+			
 			resultText.name = name
 			--resultText.rawmessage = message
 			resultText.message = prepareMessage(message)
