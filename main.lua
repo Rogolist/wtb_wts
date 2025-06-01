@@ -1,8 +1,11 @@
 local api = require("api")
+local helpers = require('wtb_wts/helpers')
 
 local logFile = {}
 logFile.Name1 = 'wtb_wts/log.lua'
 logFile.Name2 = 'wtb_wts/massiv.lua'
+
+local timeZone = 2
 
 --[[
 	Альфа вариант:
@@ -22,7 +25,7 @@ logFile.Name2 = 'wtb_wts/massiv.lua'
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.3a", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
+    version = "0.0.3b", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
     desc = "Trade proposition logging"
 }
 
@@ -144,7 +147,18 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
 			if logFile.data2.wts == nil then logFile.data2.wts = {} end
 			
 			local resultText = {}
-			resultText.time = api.Time:GetLocalTime()
+			
+			
+			resultText.timestamp = api.Time:GetLocalTime()
+			
+            local date = helpers.getDate(resultText.timestamp)
+
+			resultText.time = string.format(
+                                    '%02d.%02d.%d %02d:%02d',
+                                    date.day, date.month, date.year, (date.hours + timeZone),
+                                    date.minutes)
+			
+			
 			resultText.name = name
 			--resultText.rawmessage = message
 			resultText.message = prepareMessage(message)
