@@ -25,7 +25,7 @@ local timeZone = 2
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.3b", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
+    version = "0.0.3c", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
     desc = "Trade proposition logging"
 }
 
@@ -141,39 +141,35 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
         if string.sub(message, 1, 1) == "x" and string.sub(message, 2, 2) == " " then return end  
 
 
+		local resultText = {}
+		
+		--resultText.channel = channel -- 6 nation, 14 faction
+		
+		if channel == 6 then resultText.channel = "N"
+		elseif channel == 14 then resultText.channel = "F"
+		end
+		
+		resultText.timestamp = api.Time:GetLocalTime()
+		
+		local date = helpers.getDate(resultText.timestamp)
+
+		resultText.time = string.format(
+								'%02d.%02d.%d %02d:%02d',
+								date.day, date.month, date.year, (date.hours + timeZone),
+								date.minutes)
+
+		resultText.name = name
+		--resultText.rawmessage = message
+		resultText.message = prepareMessage(message)
+		--api.Log:Err(resultText.message)
 
 		if string.find(message, 'WTS', 1, true) or string.find(message, 'wts', 1, true) or string.find(message, 'WTT/S', 1, true) or string.find(message, 'WTTS', 1, true) then
 			if logFile.data1.wts == nil then logFile.data1.wts = {} end
 			if logFile.data2.wts == nil then logFile.data2.wts = {} end
-			
-			local resultText = {}
-			
-			
-			resultText.timestamp = api.Time:GetLocalTime()
-			
-            local date = helpers.getDate(resultText.timestamp)
 
-			resultText.time = string.format(
-                                    '%02d.%02d.%d %02d:%02d',
-                                    date.day, date.month, date.year, (date.hours + timeZone),
-                                    date.minutes)
-			
-			
-			resultText.name = name
-			--resultText.rawmessage = message
-			resultText.message = prepareMessage(message)
-
-				--api.Log:Err(resultText.message)
-
-			table.insert(logFile.data1.wts,  (resultText.time .."|".. resultText.name .."|".. resultText.message))
-			--saveData(logFile.data1)
-			
-				api.Log:Info(resultText.time .." ".. resultText.name .." ".. resultText.message)
-			
+			table.insert(logFile.data1.wts,  (resultText.time .."|".. resultText.channel .."|".. resultText.name .."|".. resultText.message))
 			table.insert(logFile.data2.wts, resultText)
-			--api.Log:Info(logFile.data.wts)
-			--saveData(logFile.data2)
-			
+
 			api.File:Write(logFile.Name1, logFile.data1)
 			api.File:Write(logFile.Name2, logFile.data2)
 		end
@@ -183,36 +179,35 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
 		if string.find(message, 'WTB', 1, true) or string.find(message, 'wtb', 1, true) then
 			if logFile.data1.wtb == nil then logFile.data1.wtb = {} end
 			if logFile.data2.wtb == nil then logFile.data2.wtb = {} end
-			
-			local resultText = {}
-			
-			resultText.timestamp = api.Time:GetLocalTime()
-			
-            local date = helpers.getDate(resultText.timestamp)
 
-			resultText.time = string.format(
-                                    '%02d.%02d.%d %02d:%02d',
-                                    date.day, date.month, date.year, (date.hours + timeZone),
-                                    date.minutes)
-			
-			
-			resultText.name = name
-			--resultText.rawmessage = message
-			resultText.message = prepareMessage(message)
-			--resultText.items = resultText.message
-
-				--api.Log:Err(resultText.message)
-
-			table.insert(logFile.data1.wtb,  (resultText.time .."|".. resultText.name .."|".. resultText.message))
-			
-				api.Log:Info(resultText.time .." ".. resultText.name .." ".. resultText.message)
-				
+			table.insert(logFile.data1.wtb,  (resultText.time .."|".. resultText.channel .."|".. resultText.name .."|".. resultText.message))
 			table.insert(logFile.data2.wtb, resultText)
-			--api.Log:Info(logFile.data.wtb)
-			
+
 			api.File:Write(logFile.Name1, logFile.data1)
 			api.File:Write(logFile.Name2, logFile.data2)
 		end
+		
+		if string.find(message, '16x16', 1, true) or
+			string.find(message, '16 x 16', 1, true) or
+			string.find(message, '24x24', 1, true) or
+			string.find(message, '24 x 24', 1, true) or
+			string.find(message, '48x48', 1, true) or			
+			string.find(message, '48 x 48', 1, true) or
+			string.find(message, 'house', 1, true) then
+			if logFile.data1.land == nil then logFile.data1.land = {} end
+			if logFile.data2.land == nil then logFile.data2.land = {} end
+
+			table.insert(logFile.data1.land,  (resultText.time .."|".. resultText.channel .."|".. resultText.name .."|".. resultText.message))
+			table.insert(logFile.data2.land, resultText)
+
+			api.File:Write(logFile.Name1, logFile.data1)
+			api.File:Write(logFile.Name2, logFile.data2)
+		end
+		
+		
+		
+		
+		
    end
 end
 
