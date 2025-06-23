@@ -2,8 +2,13 @@ local api = require("api")
 local helpers = require('wtb_wts/helpers')
 
 local logFile = {}
-logFile.Name1 = 'wtb_wts/log.lua'
-logFile.Name2 = 'wtb_wts/massiv.lua'
+--logFile.Name1 = 'wtb_wts/log.lua'
+--logFile.Name2 = 'wtb_wts/massiv.lua'
+
+--local message = {}
+--message.text = "_:_test" --"WTB [Obsidian Staff]"
+--message.maxDelay = 3600
+--message.delay = 0
 
 local timeZone = 2
 
@@ -25,7 +30,7 @@ local timeZone = 2
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.3c", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
+    version = "0.0.4", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
     desc = "Trade proposition logging"
 }
 
@@ -145,8 +150,10 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
 		
 		--resultText.channel = channel -- 6 nation, 14 faction
 		
-		if channel == 6 then resultText.channel = "N"
-		elseif channel == 14 then resultText.channel = "F"
+		if channel == 6 then resultText.channel = "Nation"
+		elseif channel == 14 then resultText.channel = "Faction"
+		elseif channel == 1 then resultText.channel = "Shout"
+		else resultText.channel = channel
 		end
 		
 		resultText.timestamp = api.Time:GetLocalTime()
@@ -211,14 +218,92 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
    end
 end
 
+--[[
+local function OnUpdate()
+
+	if message.delay == message.maxDelay then
+		--local currentTime = parseTime(api.Time.GetLocalTime())
+		
+		api.Log:info(message.text)
+	
+		-- DispatchChatMessage(channel, message)
+		X2Chat:DispatchChatMessage(1, message.text)
+		X2Chat:DispatchChatMessage(2, message.text)
+		X2Chat:DispatchChatMessage(3, message.text)
+		
+		--X2Chat:DispatchChatMessage(1, (currentTime .. message.text))
+		--X2Chat:DispatchChatMessage(2, (currentTime .. message.text))
+		--X2Chat:DispatchChatMessage(3, (currentTime .. message.text))
+
+		message.delay = 0
+	end
+
+	if message.delay < message.maxDelay then
+		message.delay = message.delay + 1
+	end
+	
+	api.Log:info(message.delay)
+end
+]]
+
+--[[
+local clockTimer = 0
+local clockResetTime = (60*1000)
+
+--resultText.channel = channel -- 6 nation, 14 faction
+local function OnUpdate(dt)
+	if clockTimer + dt > clockResetTime then
+		--api.Log:Info(message.text)
+		--X2Chat:DispatchChatMessage(6, message.text)
+		--X2Chat:DispatchChatMessage(14, message.text)
+		--X2Chat:DispatchChatMessage("Local", message.text)
+		
+		for i=0,15 do
+			local mess = tostring(i .. message.text)
+			api.Log:Info(mess)
+			X2Chat:DispatchChatMessage(i, mess)
+		end
+		
+		clockTimer = 0
+	end 
+	clockTimer = clockTimer + dt
+	--api.Log:Info(clockTimer)
+end 
+]]
+
+
 -- from cant_read
 local function OnLoad()
+
+	--message.delay = 0
+	--api.Log:Info(message.text)
 
     api.Log:Info("Loaded " .. wtb_wts.name .. " v" ..
                      wtb_wts.version .. " by " .. wtb_wts.author)
 	
     local settings = api.GetSettings("wtb_wts")
     --base64 = require('cant_read/base64/rfc')
+	
+	
+	
+	local date = helpers.getDate(api.Time:GetLocalTime())
+	
+
+	date = string.format(
+							'%02d.%02d.%d',
+							date.year, date.month, date.day)
+	
+	--[[
+	date = string.format(
+								'%02d.%02d.%d %02d:%02d',
+								date.day, date.month, date.year, (date.hours + timeZone),
+								date.minutes)
+	]]
+	
+	logFile.Name1 = 'wtb_wts/log_'..date..'.lua'
+	logFile.Name2 = 'wtb_wts/massiv_'..date..'.lua'
+
+	api.Log:Info(logFile.Name1 .. " and " ..logFile.Name2)
 
 	logFile.data1 = getData(logFile.Name1)
 	logFile.data2 = getData(logFile.Name2)
@@ -239,6 +324,7 @@ local function OnLoad()
     end
     wtb_wtsWindow:SetHandler("OnEvent", wtb_wtsWindow.OnEvent)
     wtb_wtsWindow:RegisterEvent("CHAT_MESSAGE")
+
 
     api.On("UPDATE", OnUpdate)
     api.SaveSettings()
