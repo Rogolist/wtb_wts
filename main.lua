@@ -1,5 +1,5 @@
 local api = require("api")
-local helpers = require('wtb_wts/helpers')
+--local helpers = require('wtb_wts/helpers')
 
 local logFile = {}
 --logFile.Name1 = 'wtb_wts/log.lua'
@@ -30,7 +30,7 @@ local timeZone = 2
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.4", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет, сообщение
+    version = "0.0.5", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет ?, сообщение
     desc = "Trade proposition logging"
 }
 
@@ -135,6 +135,110 @@ local function prepareMessage(message)
 
 end
 
+
+
+
+
+function getDate(timestamp)
+    --local settings = helpers.getSettings()
+    local timestamp = timestamp or api.Time:GetLocalTime()
+	local timezone_offset = 0
+    --local timezone_offset = settings.timezone_offset * 3600
+	local timezone_offset = timezone_offset * 3600
+    local localTimestamp = X2Util:StrNumericAdd(tostring(timestamp),
+                                                tostring(timezone_offset))
+
+    -- Количество секунд в сутках
+    local secondsInADay = "86400"
+
+    -- Вычисляем количество дней, прошедших с 1 января 1970
+    local daysSinceEpoch = tonumber(X2Util:DivideNumberString(localTimestamp,
+                                                              secondsInADay))
+    -- Определяем год
+    local year = 1970
+    while daysSinceEpoch >= 365 do
+        -- Проверяем високосный год
+        local isLeapYear = (year % 4 == 0 and year % 100 ~= 0) or
+                               (year % 400 == 0)
+        local daysInYear = isLeapYear and 366 or 365
+
+        -- Если дней хватает на целый год, вычитаем его
+        if daysSinceEpoch >= daysInYear then
+            daysSinceEpoch = tonumber(X2Util:StrNumericSub(tostring(
+                                                               daysSinceEpoch),
+                                                           tostring(daysInYear)))
+            year = year + 1
+        else
+            break
+        end
+    end
+
+    -- Определяем месяц и день
+    local month = 1
+    local daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+
+    -- Учитываем високосные годы
+    if (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0) then
+        daysInMonth[2] = 29
+    end
+
+    while daysSinceEpoch >= daysInMonth[month] do
+        daysSinceEpoch = tonumber(X2Util:StrNumericSub(tostring(daysSinceEpoch),
+                                                       tostring(
+                                                           daysInMonth[month])))
+        month = month + 1
+    end
+
+    local day = X2Util:StrNumericAdd(tostring(daysSinceEpoch), "1") -- Дни считаются с 0, поэтому +1
+
+    -- Вычисляем часы, минуты, секунды
+    local fullDaysInSeconds = X2Util:StrIntegerMul(
+                                  X2Util:DivideNumberString(localTimestamp,
+                                                            secondsInADay),
+                                  secondsInADay)
+    local remainingSeconds = X2Util:StrNumericSub(localTimestamp,
+                                                  fullDaysInSeconds)
+
+    local hours = X2Util:DivideNumberString(remainingSeconds, "3600")
+    local hoursInSeconds = X2Util:StrIntegerMul(hours, "3600")
+
+    local minutes = X2Util:DivideNumberString(
+                        X2Util:StrNumericSub(remainingSeconds, hoursInSeconds),
+                        "60")
+    local minutesInSeconds = X2Util:StrIntegerMul(minutes, "60")
+
+    local seconds = X2Util:StrNumericSub(
+                        X2Util:StrNumericSub(remainingSeconds, hoursInSeconds),
+                        minutesInSeconds)
+
+    local weekday = (tonumber(daysSinceEpoch) + 4) % 7
+
+    -- Посчитаем день в году
+    local dayOfYear = 0
+    for m = 1, month - 1 do dayOfYear = dayOfYear + daysInMonth[m] end
+    dayOfYear = dayOfYear + tonumber(day)
+
+    -- Определяем день недели 1 января
+    local jan1Weekday = (weekday - (dayOfYear % 7) + 7) % 7 -- День недели 1 января
+
+    -- ISO-нумерация недель (первая неделя начинается с понедельника)
+    local weekNumber = math.floor((dayOfYear + jan1Weekday - 1) / 7) + 1
+
+    return {
+        year = year,
+        month = month,
+        day = tonumber(day),
+        hours = tonumber(hours),
+        minutes = tonumber(minutes),
+        seconds = tonumber(seconds),
+        weekday = weekday,
+        weekNumber = weekNumber, -- Номер недели
+        dayOfYear = dayOfYear
+    }
+end
+
+
+
 -- from Navigate
 -- if event == "WORLD_MESSAGE" then openCoordsPromptFromWorldMessage(msg, iconKey, sextants, info) 
 -- if event == "CHAT_MESSAGE" then if arg ~= nil then writeChatToTranslatingFile(channel, unit, isHostile, name, message, speakerInChatBound, specifyName, factionName, trialPosition)
@@ -158,7 +262,7 @@ local function OnChatMessage(channel, unit, isHostile, name, message, speakerInC
 		
 		resultText.timestamp = api.Time:GetLocalTime()
 		
-		local date = helpers.getDate(resultText.timestamp)
+		local date = getDate(resultText.timestamp)
 
 		resultText.time = string.format(
 								'%02d.%02d.%d %02d:%02d',
@@ -286,7 +390,7 @@ local function OnLoad()
 	
 	
 	
-	local date = helpers.getDate(api.Time:GetLocalTime())
+	local date = getDate(api.Time:GetLocalTime())
 	
 
 	date = string.format(
