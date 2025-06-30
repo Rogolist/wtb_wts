@@ -1,386 +1,283 @@
-local api = require("api")
+--local api = require("wtb_wts/api")
 --local helpers = require('wtb_wts/helpers')
+--local UI = require("Navigate/ui")
 
-local logFile = {}
---logFile.Name1 = 'wtb_wts/log.lua'
---logFile.Name2 = 'wtb_wts/massiv.lua'
-
---local message = {}
---message.text = "_:_test" --"WTB [Obsidian Staff]"
---message.maxDelay = 3600
---message.delay = 0
+	local messlogger = require('wtb_wts/messlogger')
+	--local ui = require('wtb_wts/ui')
 
 local timeZone = 2
+local wtb_wtsWindow
+local resultList = {}
+--local messlogger, ui, logFile = {}
 
---[[
-	Альфа вариант:
-	1) мониторим чат
-	2) находим ключевое слово
-	3) выводим сообщение в системный лог
-]]
-
---[[
-	Бета вариант
-	1) открываем файл записи
-	2) следим за сообщениями в чатах
-	3) если попадается ключевое слово - пишем в файл
-
-]]
+-- нужно для файла-массива сохранять все предметы из сообщения в подмассив ?
 
 local wtb_wts = {
     name = "wtb_wts",
     author = "Psejik",
-    version = "0.0.5", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет ?, сообщение
+    version = "0.0.6", -- добавить время сообщения, сохранять в виде массива: персонаж, время, предмет ?, сообщение
     desc = "Trade proposition logging"
 }
 
-local wtb_wtsWindow
+--wtb_wts.Init = function() end
 
-
-function getData(filename)
-    local data = api.File:Read(filename)
-    if data == nil then return {} end
-    return data
-end
-
---[[
-GetSavedItems = function(reverse)
-    if reverse == nil then reverse = false end
-    local savedData = api.File:Read(logFile.Name)
-    return savedData or {}
-end
-]]
-
---function saveData(filename, data) api.File:Write(filename, data) end
-
-
-
-local function split(s, sep)
-    local fields = {}
-    local sep = sep or " "
-    local pattern = string.format("([^%s]+)", sep)
-    string.gsub(s, pattern, function(c) fields[#fields + 1] = c end)
-    return fields
-end
-
-local function itemIdFromItemLinkText(itemLinkText)
-    local itemIdStr = string.sub(itemLinkText, 3)
-    itemIdStr = split(itemIdStr, ",")
-    itemIdStr = itemIdStr[1]
-    return itemIdStr
-end 
-
--- Функція для витягування та заміни частин тексту в квадратних дужках
-local function extractProtected(text)
-    local protected = {}
-    local i = 0
-    local modified = text:gsub("%b[]", function(block)
-        i = i + 1
-        protected[i] = block
-        return string.format("[[TOKEN_%d]]", i)
-    end)
-    return modified, protected
-end
-
--- Відновлює частини тексту, що були в квадратних дужках
-local function restoreProtected(text, protected)
-    for i, block in ipairs(protected) do
-        text = text:gsub(string.format("%[%[TOKEN_%d%]%]", i), block)
-    end
-    return text
-end
-
-
--- магия над мессаджем )
-local function prepareMessage(message)
-
-	-- Заміняємо частини в квадратних дужках на тимчасові токени
-	local cleanedMessage, protectedParts = extractProtected(message)
+local function createResultList()
 	
-	--api.Log:Err(cleanedMessage .." == ".. protectedParts)
-	--api.Log:Err(cleanedMessage)
+	-- выпадающий список результатов
+	--[[
+	resultList = W_CTRL.CreateScrollListBox("resultList", ui.wtb_wtsWindow)
+	--local resultList =  api.Interface:CreateEmptyWindow("results", ui.wtb_wtsWindow) --just for test
+	resultList:SetExtent(ui.wtb_wtsWindow:GetWidth() - 10 , ui.wtb_wtsWindow:GetHeight() - 80)
+	resultList:AddAnchor("BOTTOMLEFT", ui.wtb_wtsWindow, -5, -10)	-- приаязка "TOPLEFT"
 	
-	-- Replace item link text with the item's name
-	local count = 0
-	while string.find(cleanedMessage, "|i") and count < 5 do -- fix this condition
-		local beginIndex, _ = string.find(cleanedMessage, "|i")
-		local _, endIndex = string.find(cleanedMessage, '0;')
-		if beginIndex ~= nil and endIndex ~= nil then 
-			local itemLinkText = string.sub(cleanedMessage, beginIndex, endIndex)
-			local itemId = itemIdFromItemLinkText(itemLinkText)
-			local itemInfo = api.Item:GetItemInfoByType(tonumber(itemId))
+	resultList.content:UseChildStyle(true)
+	resultList.content:EnableSelectParent(false)
+	resultList.content:SetInset(5, 5, 8, 5)
+	resultList.content.itemStyle:SetFontSize(FONT_SIZE.LARGE)
+	resultList.content.childStyle:SetFontSize(FONT_SIZE.MIDDLE)
+	resultList.content.itemStyle:SetAlign(ALIGN_LEFT)
+	resultList.content:SetTreeTypeIndent(true, 20)
+	resultList.content:SetHeight(FONT_SIZE.MIDDLE)
+	resultList.content:ShowTooltip(true)
+	--resultList:SetText("resultList")
+	resultList.content:SetSubTextOffset(20, 0, true)
+	local color = FONT_COLOR.TITLE
+	resultList.content:SetDefaultItemTextColor(color[1], color[2], color[3], color[4])
+	color = FONT_COLOR.DEFAULT
+	resultList.content.childStyle:SetColor(color[1], color[2], color[3], color[4])
+	
+	-- наполнение
+	--local listTable = getList() -- возвращает listTable с результатом поиска
+	
+	local listTable = {"test1", "test2"}
+	resultList:SetItemTrees(listTable)
+	]]
+
+	--function resultList:OnSelChanged()
+		--local selectedItem = resultList:GetSelectedIndex()
+		--if index == 0 or index == -1 then return end 
+
+		--local value = resultList:GetSelectedValue()
+		--if value == 0 then return end
+		-- api.Log:Info("Selected value: " .. tostring(value))
+		-- Get the map path for the selected value
+		--local id = value
+		--local zone = doodadsHelper:GetDoodadZoneKey(resultList:GetSelectedText())
+		
+		-- запросить сстылку на файл изображения для -> dawnsdropMapWindow.mapDrawable:SetTexture(.....)
+		--local mapDdsPath = doodadsHelper:GetDoodadZoneFilePath(id, zone)
+		-- Set the map drawable to the new path
+		--setSpawnMapImage(mapDdsPath)
+
+	--end
+
+	
+	--ui.wtb_wtsWindow:Show(true)
+	
+	
+	-- поиск по тексту
+	-- Category dropdown and search text box 
+	
+	--local resultList = api.Interface:CreateComboBox(ui.wtb_wtsWindow)
+	resultList = W_CTRL.CreateScrollListBox("resultList", wtb_wtsWindow)
+	--local resultList = api.Interface:CreateWidget('textbox', "resultList", ui.wtb_wtsWindow) --(type, id, parent)
+    --resultListBtn:AddAnchor("TOPLEFT", ui.wtb_wtsWindow, 10, 50)
+	resultList:AddAnchor("BOTTOMLEFT", wtb_wtsWindow, 5, -10)	-- приаязка "TOPLEFT"
+    --resultListBtn:SetWidth(180)
+	resultList:SetExtent(wtb_wtsWindow:GetWidth() - 10 , wtb_wtsWindow:GetHeight() - 80)
+    --resultList.style:SetFontSize(FONT_SIZE.LARGE)
+    --resultListBtn.dropdownItem = doodadCategories
+	--resultList.dropdownItem = {"test1", "test2"}
+    --resultListBtn:Select(messlogger.data2)
+	
+	--categoryList:AddAnchor("TOPLEFT", dawnsdropMapWindow, 0, 90)	-- приаязка
+	resultList.content:UseChildStyle(true)
+	resultList.content:EnableSelectParent(false)
+	resultList.content:SetInset(5, 5, 8, 5)
+	resultList.content.itemStyle:SetFontSize(FONT_SIZE.LARGE)
+	resultList.content.childStyle:SetFontSize(FONT_SIZE.MIDDLE)
+	resultList.content.itemStyle:SetAlign(ALIGN_LEFT)
+	resultList.content:SetTreeTypeIndent(true, 20)
+	resultList.content:SetHeight(FONT_SIZE.MIDDLE)
+	resultList.content:ShowTooltip(true)
+	resultList.content:SetSubTextOffset(20, 0, true)
+	local color = FONT_COLOR.TITLE
+	resultList.content:SetDefaultItemTextColor(color[1], color[2], color[3], color[4])
+	color = FONT_COLOR.DEFAULT
+	resultList.content.childStyle:SetColor(color[1], color[2], color[3], color[4])
+	
+	
+	local listTable = {{"34","57"},{1,2,3}}
+	resultList:SetItemTrees(listTable)
+	
+	--wtb_wtsWindow.resultList = resultList
+	--return resultList
+end
+
+local function mainWindow()
+	
+	--api.Log:Info("ui.mainWindow runned")
+
+	--logFile.data = GetSavedItems()
+
+    --ui.wtb_wtsWindow = api.Interface:CreateEmptyWindow("ui.wtb_wtsWindow", "UIParent")
+	--ui.wtb_wtsWindow = api.Interface:CreateEmptyWindow("ui.wtb_wtsWindow", "WTB WTS addon")
+	wtb_wtsWindow = api.Interface:CreateWindow("wtb_wtsWindow", "WTB WTS addon")
+	
+	--ui.wtb_wtsWindow:AddAnchor("CENTER", "UIParent", 0, 0)
+	wtb_wtsWindow:AddAnchor("TOPRIGHT", "UIParent", -200, 200)
+	local windowSize = {600, 200}
+	wtb_wtsWindow:SetExtent(windowSize[1], windowSize[2])
+
+
+	--createResultList() -- действительно создает результирующий список !
+
+
+	resultList = W_CTRL.CreateScrollListBox("resultList", wtb_wtsWindow)
+	--local resultList = api.Interface:CreateWidget('textbox', "resultList", ui.wtb_wtsWindow) --(type, id, parent)
+    --resultListBtn:AddAnchor("TOPLEFT", ui.wtb_wtsWindow, 10, 50)
+	resultList:AddAnchor("BOTTOMLEFT", wtb_wtsWindow, 5, -10)	-- приаязка "TOPLEFT"
+    --resultListBtn:SetWidth(180)
+	resultList:SetExtent(wtb_wtsWindow:GetWidth() - 10 , wtb_wtsWindow:GetHeight() - 80)
+    --resultList.style:SetFontSize(FONT_SIZE.LARGE)
+    --resultListBtn.dropdownItem = doodadCategories
+	--resultList.dropdownItem = {"test1", "test2"}
+    --resultListBtn:Select(messlogger.data2)
+	
+	--categoryList:AddAnchor("TOPLEFT", dawnsdropMapWindow, 0, 90)	-- приаязка
+	resultList.content:UseChildStyle(true)
+	resultList.content:EnableSelectParent(false)
+	resultList.content:SetInset(5, 5, 8, 5)
+	resultList.content.itemStyle:SetFontSize(FONT_SIZE.LARGE)
+	resultList.content.childStyle:SetFontSize(FONT_SIZE.MIDDLE)
+	resultList.content.itemStyle:SetAlign(ALIGN_LEFT)
+	resultList.content:SetTreeTypeIndent(true, 20)
+	resultList.content:SetHeight(FONT_SIZE.MIDDLE)
+	resultList.content:ShowTooltip(true)
+	resultList.content:SetSubTextOffset(20, 0, true)
+	local color = FONT_COLOR.TITLE
+	resultList.content:SetDefaultItemTextColor(color[1], color[2], color[3], color[4])
+	color = FONT_COLOR.DEFAULT
+	resultList.content.childStyle:SetColor(color[1], color[2], color[3], color[4])
+	
+	
+	local listTable = {{"34","57"},{1,2,3}}
+	resultList:SetItemTrees(listTable)
+	
+	
+	
+
+	-- Doodad Name Search
+	--local listTable = {}
+    local searchTextEdit = W_CTRL.CreateEdit("searchTextEdit", wtb_wtsWindow)
+    searchTextEdit:SetExtent(wtb_wtsWindow:GetWidth()-40, 24)
+	--searchTextEdit:SetExtent(ui.wtb_wtsWindow:GetWidth(), ui.wtb_wtsWindow:GetHeight() - 100)	
+    searchTextEdit:AddAnchor("TOPLEFT", wtb_wtsWindow, 20, 30)	--"TOPLEFT" "TOPRIGHT"
+    searchTextEdit.style:SetFontSize(FONT_SIZE.XLARGE)
+    -- Doodad Name Search OnTextChanged
+    function searchTextEdit:OnTextChanged()
+        local searchText = searchTextEdit:GetText()
+        if #searchText > 2 or #searchText == 0 then 
+			-- запрос по категори и тексту
+            --local listTable = getList(doodadCategoryBtn:GetSelectedIndex(), searchText)
+			--api.Log:Info(searchText)
+			--local listTable = getList(searchText)
+			--api.Log:Info(listTable)
+			local listTable = {{searchText, searchText .. "12"},{1,2,3}}
+			--api.Log:Info(listTable)
 			
-			local beforeLink = string.sub(cleanedMessage, 0, beginIndex)
-			local afterLink = string.sub(cleanedMessage, endIndex + 1, #cleanedMessage)
-			--cleanedMessage = beforeLink .. "" .. itemInfo.name .. " " .. afterLink 
-			cleanedMessage = beforeLink .. "[" .. itemInfo.name .. "] " .. afterLink 
-		end 
-		count = count + 1
-	end 
-	
-	cleanedMessage = string.gsub(cleanedMessage, "%|", "")
-	
-	-- Тепер відновлюємо частини в квадратних дужках після перекладу
-	cleanedMessage = restoreProtected(cleanedMessage, protectedParts)
-	
-	--local endText = {chatMsg=tostring"||||"..(channel).."||||"..name.."||||"..cleanedMessage.."||||"}
-	--api.File:Write(logFile.Name, endText)
-
-	--local resultText = (name .. ": ".. cleanedMessage)
-	--api.Log:Err("[WTB/WTS] " .. resultText)
-	--api.Log:Info(endText)
-
-	--return resultText
-	return cleanedMessage
-
-end
-
-
-
-
-
-function getDate(timestamp)
-    --local settings = helpers.getSettings()
-    local timestamp = timestamp or api.Time:GetLocalTime()
-	local timezone_offset = 0
-    --local timezone_offset = settings.timezone_offset * 3600
-	local timezone_offset = timezone_offset * 3600
-    local localTimestamp = X2Util:StrNumericAdd(tostring(timestamp),
-                                                tostring(timezone_offset))
-
-    -- Количество секунд в сутках
-    local secondsInADay = "86400"
-
-    -- Вычисляем количество дней, прошедших с 1 января 1970
-    local daysSinceEpoch = tonumber(X2Util:DivideNumberString(localTimestamp,
-                                                              secondsInADay))
-    -- Определяем год
-    local year = 1970
-    while daysSinceEpoch >= 365 do
-        -- Проверяем високосный год
-        local isLeapYear = (year % 4 == 0 and year % 100 ~= 0) or
-                               (year % 400 == 0)
-        local daysInYear = isLeapYear and 366 or 365
-
-        -- Если дней хватает на целый год, вычитаем его
-        if daysSinceEpoch >= daysInYear then
-            daysSinceEpoch = tonumber(X2Util:StrNumericSub(tostring(
-                                                               daysSinceEpoch),
-                                                           tostring(daysInYear)))
-            year = year + 1
-        else
-            break
-        end
-    end
-
-    -- Определяем месяц и день
-    local month = 1
-    local daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-
-    -- Учитываем високосные годы
-    if (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0) then
-        daysInMonth[2] = 29
-    end
-
-    while daysSinceEpoch >= daysInMonth[month] do
-        daysSinceEpoch = tonumber(X2Util:StrNumericSub(tostring(daysSinceEpoch),
-                                                       tostring(
-                                                           daysInMonth[month])))
-        month = month + 1
-    end
-
-    local day = X2Util:StrNumericAdd(tostring(daysSinceEpoch), "1") -- Дни считаются с 0, поэтому +1
-
-    -- Вычисляем часы, минуты, секунды
-    local fullDaysInSeconds = X2Util:StrIntegerMul(
-                                  X2Util:DivideNumberString(localTimestamp,
-                                                            secondsInADay),
-                                  secondsInADay)
-    local remainingSeconds = X2Util:StrNumericSub(localTimestamp,
-                                                  fullDaysInSeconds)
-
-    local hours = X2Util:DivideNumberString(remainingSeconds, "3600")
-    local hoursInSeconds = X2Util:StrIntegerMul(hours, "3600")
-
-    local minutes = X2Util:DivideNumberString(
-                        X2Util:StrNumericSub(remainingSeconds, hoursInSeconds),
-                        "60")
-    local minutesInSeconds = X2Util:StrIntegerMul(minutes, "60")
-
-    local seconds = X2Util:StrNumericSub(
-                        X2Util:StrNumericSub(remainingSeconds, hoursInSeconds),
-                        minutesInSeconds)
-
-    local weekday = (tonumber(daysSinceEpoch) + 4) % 7
-
-    -- Посчитаем день в году
-    local dayOfYear = 0
-    for m = 1, month - 1 do dayOfYear = dayOfYear + daysInMonth[m] end
-    dayOfYear = dayOfYear + tonumber(day)
-
-    -- Определяем день недели 1 января
-    local jan1Weekday = (weekday - (dayOfYear % 7) + 7) % 7 -- День недели 1 января
-
-    -- ISO-нумерация недель (первая неделя начинается с понедельника)
-    local weekNumber = math.floor((dayOfYear + jan1Weekday - 1) / 7) + 1
-
-    return {
-        year = year,
-        month = month,
-        day = tonumber(day),
-        hours = tonumber(hours),
-        minutes = tonumber(minutes),
-        seconds = tonumber(seconds),
-        weekday = weekday,
-        weekNumber = weekNumber, -- Номер недели
-        dayOfYear = dayOfYear
-    }
-end
-
-
-
--- from Navigate
--- if event == "WORLD_MESSAGE" then openCoordsPromptFromWorldMessage(msg, iconKey, sextants, info) 
--- if event == "CHAT_MESSAGE" then if arg ~= nil then writeChatToTranslatingFile(channel, unit, isHostile, name, message, speakerInChatBound, specifyName, factionName, trialPosition)
---local function OnChatMessage(channelId, speakerId, _, speakerName, message)
-local function OnChatMessage(channel, unit, isHostile, name, message, speakerInChatBound, specifyName, factionName, trialPosition)
-
-	if name ~= nil and #message > 2 then
-        -- Skip messages beginning with x and a space (looking for raid invites)
-        if string.sub(message, 1, 1) == "x" and string.sub(message, 2, 2) == " " then return end  
-
-
-		local resultText = {}
-		
-		--resultText.channel = channel -- 6 nation, 14 faction
-		
-		if channel == 6 then resultText.channel = "Nation"
-		elseif channel == 14 then resultText.channel = "Faction"
-		elseif channel == 1 then resultText.channel = "Shout"
-		else resultText.channel = channel
-		end
-		
-		resultText.timestamp = api.Time:GetLocalTime()
-		
-		local date = getDate(resultText.timestamp)
-
-		resultText.time = string.format(
-								'%02d.%02d.%d %02d:%02d',
-								date.day, date.month, date.year, (date.hours + timeZone),
-								date.minutes)
-
-		resultText.name = name
-		--resultText.rawmessage = message
-		resultText.message = prepareMessage(message)
-		--api.Log:Err(resultText.message)
-
-		if string.find(message, 'WTS', 1, true) or string.find(message, 'wts', 1, true) or string.find(message, 'WTT/S', 1, true) or string.find(message, 'WTTS', 1, true) then
-			if logFile.data1.wts == nil then logFile.data1.wts = {} end
-			if logFile.data2.wts == nil then logFile.data2.wts = {} end
-
-			table.insert(logFile.data1.wts,  (resultText.time .."|".. resultText.channel .."|".. resultText.name .."|".. resultText.message))
-			table.insert(logFile.data2.wts, resultText)
-
-			api.File:Write(logFile.Name1, logFile.data1)
-			api.File:Write(logFile.Name2, logFile.data2)
-		end
-		
-		
-		
-		if string.find(message, 'WTB', 1, true) or string.find(message, 'wtb', 1, true) then
-			if logFile.data1.wtb == nil then logFile.data1.wtb = {} end
-			if logFile.data2.wtb == nil then logFile.data2.wtb = {} end
-
-			table.insert(logFile.data1.wtb,  (resultText.time .."|".. resultText.channel .."|".. resultText.name .."|".. resultText.message))
-			table.insert(logFile.data2.wtb, resultText)
-
-			api.File:Write(logFile.Name1, logFile.data1)
-			api.File:Write(logFile.Name2, logFile.data2)
-		end
-		
-		if string.find(message, '16x16', 1, true) or
-			string.find(message, '16 x 16', 1, true) or
-			string.find(message, '24x24', 1, true) or
-			string.find(message, '24 x 24', 1, true) or
-			string.find(message, '48x48', 1, true) or			
-			string.find(message, '48 x 48', 1, true) or
-			string.find(message, 'house', 1, true) then
-			if logFile.data1.land == nil then logFile.data1.land = {} end
-			if logFile.data2.land == nil then logFile.data2.land = {} end
-
-			table.insert(logFile.data1.land,  (resultText.time .."|".. resultText.channel .."|".. resultText.name .."|".. resultText.message))
-			table.insert(logFile.data2.land, resultText)
-
-			api.File:Write(logFile.Name1, logFile.data1)
-			api.File:Write(logFile.Name2, logFile.data2)
-		end
-		
-		
-		
-		
-		
-   end
-end
-
---[[
-local function OnUpdate()
-
-	if message.delay == message.maxDelay then
-		--local currentTime = parseTime(api.Time.GetLocalTime())
-		
-		api.Log:info(message.text)
-	
-		-- DispatchChatMessage(channel, message)
-		X2Chat:DispatchChatMessage(1, message.text)
-		X2Chat:DispatchChatMessage(2, message.text)
-		X2Chat:DispatchChatMessage(3, message.text)
-		
-		--X2Chat:DispatchChatMessage(1, (currentTime .. message.text))
-		--X2Chat:DispatchChatMessage(2, (currentTime .. message.text))
-		--X2Chat:DispatchChatMessage(3, (currentTime .. message.text))
-
-		message.delay = 0
+			resultList:SetItemTrees(listTable) -- выпадающтй список массива с выбором
+			
+			--listTable = searchText
+			--table.insert(listTable, searchText)
+			--categoryList:SetItemTrees(listTable)
+		else
+			--resultList:SetItemTrees({"","","",""})
+			
+        end 
 	end
-
-	if message.delay < message.maxDelay then
-		message.delay = message.delay + 1
-	end
+	searchTextEdit:SetHandler("OnTextChanged", searchTextEdit.OnTextChanged)
+	-- Doodad Category SelectedProc
+    --function doodadCategoryBtn:SelectedProc()
+    --    local listTable = getDoodadList(doodadCategoryBtn:GetSelectedIndex(), searchTextEdit:GetText())
+	--	categoryList:SetItemTrees(listTable)
+    --end 
 	
-	api.Log:info(message.delay)
+	wtb_wtsWindow.listTable = listTable
+	--wtb_wtsWindow.resultList = createResultList()
+	
+	
+	-- Create an overlay button (кнопка открытия окна аддона)
+	--[[
+	local overlayWnd = api.Interface:CreateEmptyWindow("overlayWnd", "UIParent") -- пустое окно для кнопки
+	local overlayBtn = overlayWnd:CreateChildWidget("button", "overlayBtn", 0, true) -- сама кнопка
+    ApplyButtonSkin(overlayBtn, BUTTON_BASIC.DEFAULT)
+    overlayBtn:SetExtent(100, 32)
+    overlayBtn:SetText("WTS WTB")
+    overlayBtn.style:SetFontSize(13)
+    overlayBtn:Show(true)
+    overlayBtn:AddAnchor("TOPRIGHT", "UIParent", -450, 30)
+    function overlayBtn:OnClick()
+        local showWnd = not ui.wtb_wtsWindow:IsVisible()
+        ui.wtb_wtsWindow:Show(showWnd)
+    end 
+    overlayBtn:SetHandler("OnClick", overlayBtn.OnClick) -- по клику появляется основное окно
+	overlayWnd:Show(true)
+    overlayWnd.overlayBtn = overlayBtn
+	]]
+	
+	wtb_wtsWindow:Show(false)
+	--wtb_wtsWindow:Show(true)
+
 end
-]]
 
---[[
-local clockTimer = 0
-local clockResetTime = (60*1000)
+local function mainButton()
 
---resultText.channel = channel -- 6 nation, 14 faction
-local function OnUpdate(dt)
-	if clockTimer + dt > clockResetTime then
-		--api.Log:Info(message.text)
-		--X2Chat:DispatchChatMessage(6, message.text)
-		--X2Chat:DispatchChatMessage(14, message.text)
-		--X2Chat:DispatchChatMessage("Local", message.text)
-		
-		for i=0,15 do
-			local mess = tostring(i .. message.text)
-			api.Log:Info(mess)
-			X2Chat:DispatchChatMessage(i, mess)
-		end
-		
-		clockTimer = 0
-	end 
-	clockTimer = clockTimer + dt
-	--api.Log:Info(clockTimer)
-end 
-]]
-
+	-- Create an overlay button (кнопка открытия окна аддона)
+	local overlayWnd = api.Interface:CreateEmptyWindow("overlayWnd", "UIParent") -- пустое окно для кнопки
+	local overlayBtn = overlayWnd:CreateChildWidget("button", "overlayBtn", 0, true) -- сама кнопка
+    ApplyButtonSkin(overlayBtn, BUTTON_BASIC.DEFAULT)
+    overlayBtn:SetExtent(100, 32)
+    overlayBtn:SetText("WTS WTB")
+    overlayBtn.style:SetFontSize(13)
+    overlayBtn:Show(true)
+    overlayBtn:AddAnchor("TOPRIGHT", "UIParent", -450, 30)
+    function overlayBtn:OnClick()
+		--api.Log:Err("Test Click")
+		--local wtb_wtsWindow = ui.wtb_wtsWindow
+        local showWnd = not wtb_wtsWindow:IsVisible()
+        wtb_wtsWindow:Show(showWnd)
+    end 
+    overlayBtn:SetHandler("OnClick", overlayBtn.OnClick) -- по клику появляется основное окно
+	overlayWnd:Show(true)
+    overlayWnd.overlayBtn = overlayBtn
+	
+	-- подписка на сообщения чата
+    function overlayBtn:OnEvent(event, ...)
+        if event == "CHAT_MESSAGE" then
+            if arg ~= nil then 
+                --writeChatToTranslatingFile(unpack(arg))
+				--api.Log:Info("WTB/WTS: " .. unpack(arg))
+				messlogger.OnChatMessage(unpack(arg))
+				
+            end 
+        end 
+    end
+    overlayBtn:SetHandler("OnEvent", overlayBtn.OnEvent)
+    overlayBtn:RegisterEvent("CHAT_MESSAGE")
+	
+end
 
 -- from cant_read
 local function OnLoad()
 
+	--local messlogger = require('wtb_wts/messlogger')
+	--local ui = require('wtb_wts/ui')
+
+	--local logFile = {}
+
 	--message.delay = 0
-	--api.Log:Info(message.text)
+	--api.Log:Info(messlogger)
 
     api.Log:Info("Loaded " .. wtb_wts.name .. " v" ..
                      wtb_wts.version .. " by " .. wtb_wts.author)
@@ -388,47 +285,32 @@ local function OnLoad()
     local settings = api.GetSettings("wtb_wts")
     --base64 = require('cant_read/base64/rfc')
 	
-	
-	
-	local date = getDate(api.Time:GetLocalTime())
-	
+	--if messlogger == nil then api.Log:Err("no messlogger") else
+
+	--local date = getDate(api.Time:GetLocalTime())
+	--[[
+	local date = messlogger.getDate(api.Time:GetLocalTime())
 
 	date = string.format(
 							'%02d.%02d.%d',
 							date.year, date.month, date.day)
 	
-	--[[
-	date = string.format(
-								'%02d.%02d.%d %02d:%02d',
-								date.day, date.month, date.year, (date.hours + timeZone),
-								date.minutes)
+	logFile.Name1 = 'wtb_wts/data/log_'..date..'.lua'
+	logFile.Name2 = 'wtb_wts/data/massiv_'..date..'.lua'
+
+	-- write in chat file names
+	--api.Log:Info(logFile.Name1 .. " and " ..logFile.Name2)
+
+	logFile.data1 = messlogger.getData(logFile.Name1)
+	logFile.data2 = messlogger.getData(logFile.Name2)
 	]]
 	
-	logFile.Name1 = 'wtb_wts/log_'..date..'.lua'
-	logFile.Name2 = 'wtb_wts/massiv_'..date..'.lua'
-
-	api.Log:Info(logFile.Name1 .. " and " ..logFile.Name2)
-
-	logFile.data1 = getData(logFile.Name1)
-	logFile.data2 = getData(logFile.Name2)
+	mainButton()
 	
-	--logFile.data = GetSavedItems()
-
-    wtb_wtsWindow = api.Interface:CreateEmptyWindow("wtb_wtsWindow", "UIParent")
-
-    function wtb_wtsWindow:OnEvent(event, ...)
-        if event == "CHAT_MESSAGE" then
-            if arg ~= nil then 
-                --writeChatToTranslatingFile(unpack(arg))
-				--api.Log:Info("WTB/WTS: " .. unpack(arg))
-				OnChatMessage(unpack(arg))
-				
-            end 
-        end 
-    end
-    wtb_wtsWindow:SetHandler("OnEvent", wtb_wtsWindow.OnEvent)
-    wtb_wtsWindow:RegisterEvent("CHAT_MESSAGE")
-
+	mainWindow()
+	--ui.CreateMainWindow()
+	
+	if wtb_wtsWindow == nil then api.Log:Info("no wtb_wtsWindow") end
 
     api.On("UPDATE", OnUpdate)
     api.SaveSettings()
@@ -438,22 +320,30 @@ end
 local function OnUnload()
 	--api.On("UPDATE", function() return end)
 	-- tier2SextantWindow = api.Interface:Free(tier2SextantWindow)
-	--[[
+
+	--ui.Unload()
+
 	if wtb_wtsWindow ~= nil then 
-		--tier2SextantWindow:Show(false)
-		wtb_wtsWindow:ReleaseHandler("OnEvent")
+		wtb_wtsWindow:Show(false)
 		wtb_wtsWindow = nil
 	end 
-	]]
+	
+	if overlayBtn ~= nil then 
+		overlayBtn:Show(false)
+		overlayBtn:ReleaseHandler("OnEvent")
+		overlayBtn = nil
+	end 
 	
     api.On("UPDATE", function() return end)
-    wtb_wtsWindow:ReleaseHandler("OnEvent")
+    --wtb_wtsWindow:ReleaseHandler("OnEvent")
 end
 
 
 
 wtb_wts.OnLoad = OnLoad
 wtb_wts.OnUnload = OnUnload
+--wtb_wts.OnChatMessage = messlogger.OnChatMessage
+
 
 --wtb_wts.OnChatMessage = OnChatMessage
 --api.On("CHAT_MESSAGE", OnChatMessage)
